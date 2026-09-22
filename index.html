@@ -118,9 +118,43 @@
       display: grid;
       place-items: center;
       margin-bottom: 36px;
-      font-size: 25px;
+      color: #e9edfa;
       background: rgba(255,255,255,.09);
       border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .icon svg {
+      width: 27px;
+      height: 27px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: .76rem;
+      font-weight: 600;
+    }
+
+    .status::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #35d399;
+      box-shadow: 0 0 0 3px rgba(53,211,153,.10);
     }
 
     .card h2 {
@@ -195,15 +229,19 @@
 
     <section class="grid" aria-label="Tjenester">
       <a class="card food" href="https://madplan.v4ng3n.xyz">
-        <div class="icon" aria-hidden="true">🍽️</div>
-        <h2>Madplan</h2>
+        <div class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M7 3v8M4.5 3v5.5A2.5 2.5 0 0 0 7 11v10M9.5 3v5.5A2.5 2.5 0 0 1 7 11M16 3v18M16 3c3 2 4 5 4 8h-4"/></svg>
+        </div>
+        <div class="title-row"><h2>Madplan</h2><span class="status">Online</span></div>
         <p>Ugens madplan, opskrifter og indkøbsliste.</p>
         <span class="arrow" aria-hidden="true">↗</span>
       </a>
 
       <a class="card home" href="https://homeassistant.v4ng3n.xyz">
-        <div class="icon" aria-hidden="true">⌂</div>
-        <h2>Home Assistant</h2>
+        <div class="icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M9 20v-6h6v6"/></svg>
+        </div>
+        <div class="title-row"><h2>Home Assistant</h2><span class="status">Online</span></div>
         <p>Styring og overblik over hjemmet.</p>
         <span class="arrow" aria-hidden="true">↗</span>
       </a>
