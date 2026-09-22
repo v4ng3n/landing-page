@@ -368,7 +368,7 @@
       msg.innerHTML="<strong>v4ng3n flappy</strong><small>tap / click / space to flap<br>best: "+(localStorage.getItem("v4ng3nFlappyBest")||0)+"</small>";
       msg.classList.remove("hidden"); last=performance.now();
     }
-    function enterGame(){ game.classList.add("active"); game.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden"; resetGame(); requestAnimationFrame(loop); }
+    function enterGame(){ game.classList.add("active"); game.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden"; mark.style.visibility="hidden"; mark.classList.remove("portal"); resetGame(); requestAnimationFrame(loop); }
     function leaveGame(){ game.classList.remove("active"); game.setAttribute("aria-hidden","true"); document.body.style.overflow=""; mark.classList.remove("portal"); mark.removeAttribute("style"); state="off"; }
 
     function flap(){
