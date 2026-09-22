@@ -61,6 +61,31 @@
       letter-spacing: -.04em;
       background: linear-gradient(145deg, #7797ff, #5067dc);
       box-shadow: 0 10px 30px rgba(84, 109, 223, .35);
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+      z-index: 20;
+      transform-origin: center;
+    }
+
+    .mark.pulse { animation: markPulse var(--dur, .24s) ease both; }
+    @keyframes markPulse {
+      0%,100% { transform: translate(0,0) scale(1); }
+      20% { transform: translate(calc(-1px * var(--shake, 1)), calc(1px * var(--shake, 1))) scale(var(--scale, 1.04)); }
+      40% { transform: translate(calc(1px * var(--shake, 1)), calc(-1px * var(--shake, 1))) scale(var(--scale, 1.04)); }
+      60% { transform: translate(calc(-1px * var(--shake, 1)), 0) scale(var(--scale, 1.04)); }
+      80% { transform: translate(calc(1px * var(--shake, 1)), calc(1px * var(--shake, 1))) scale(var(--scale, 1.04)); }
+    }
+
+    .mark.portal {
+      position: fixed;
+      margin: 0;
+      border-radius: 0;
+      z-index: 9999;
+      animation: portal .72s cubic-bezier(.72,0,.18,1) forwards;
+    }
+    @keyframes portal {
+      to { transform: scale(70); box-shadow: 0 0 120px rgba(84,109,223,.75); }
     }
 
     h1 {
@@ -185,6 +210,54 @@
       margin-top: 28px;
       color: #616a7f;
       font-size: .88rem;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .footer-thought::before { content: "·"; margin-right: 10px; }
+
+    #game {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      display: none;
+      background: linear-gradient(145deg, #7797ff, #5067dc);
+      overflow: hidden;
+      touch-action: none;
+    }
+    #game.active { display: block; }
+    #game canvas { width: 100%; height: 100%; display: block; }
+    .game-ui {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: white;
+      text-shadow: 0 2px 12px rgba(0,0,0,.25);
+    }
+    #score { font-size: 3rem; font-weight: 800; margin-top: 28px; }
+    #gameMessage {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      text-align: center;
+      background: rgba(9,13,24,.45);
+      border: 1px solid rgba(255,255,255,.18);
+      backdrop-filter: blur(12px);
+      padding: 22px 28px;
+      border-radius: 20px;
+      min-width: 250px;
+    }
+    #gameMessage strong { display:block; font-size:1.4rem; margin-bottom:7px; }
+    #gameMessage small { color: rgba(255,255,255,.72); line-height:1.5; }
+    #gameMessage.hidden { display:none; }
+    #exitGame {
+      position:absolute; top:18px; right:18px; z-index:2; pointer-events:auto;
+      border:1px solid rgba(255,255,255,.22); background:rgba(9,13,24,.28);
+      color:white; border-radius:999px; padding:9px 13px; cursor:pointer;
+      font:inherit; backdrop-filter:blur(10px);
     }
 
     @media (max-width: 650px) {
@@ -229,7 +302,130 @@
       </a>
     </section>
 
-    <footer>v4ng3n.xyz</footer>
+    <footer><span>v4ng3n.xyz</span><span class="footer-thought" id="footerThought"></span></footer>
   </main>
+
+  <div id="game" aria-hidden="true">
+    <canvas id="gameCanvas"></canvas>
+    <button id="exitGame">ESCAPE</button>
+    <div class="game-ui">
+      <div id="score">0</div>
+      <div id="gameMessage"><strong>v4ng3n flappy</strong><small>tap / click / space to flap</small></div>
+    </div>
+  </div>
+
+  <script>
+    const thoughts = [
+      "probably running on turtletank.",
+      "yes, this needed its own domain.",
+      "home, but with DNS.",
+      "it worked on localhost.",
+      "powered by electricity and questionable decisions.",
+      "one more service won't hurt.",
+      "there's probably a container for that.",
+      "the cloud is just someone else's computer.",
+      "some assembly required.",
+      "if it works, don't update it.",
+      "DNS: because remembering IPs is apparently beneath us.",
+      "no servers were harmed in the making of this page.",
+      "self-hosted, because why make it easy?",
+      "everything is probably fine.",
+      "whatever you do, don't click the V five times."
+    ];
+    document.getElementById("footerThought").textContent = thoughts[Math.floor(Math.random()*thoughts.length)];
+
+    const mark = document.querySelector(".mark");
+    let secretClicks = 0, resetSecret;
+    mark.addEventListener("click", () => {
+      secretClicks++;
+      clearTimeout(resetSecret);
+      if (secretClicks < 5) {
+        mark.style.setProperty("--shake", secretClicks * 1.6);
+        mark.style.setProperty("--scale", 1 + secretClicks * .035);
+        mark.style.setProperty("--dur", (.18 + secretClicks*.04) + "s");
+        mark.classList.remove("pulse"); void mark.offsetWidth; mark.classList.add("pulse");
+        resetSecret = setTimeout(() => secretClicks = 0, 2200);
+      } else {
+        secretClicks = 0;
+        const r = mark.getBoundingClientRect();
+        mark.style.left = r.left+"px"; mark.style.top = r.top+"px";
+        mark.style.width = r.width+"px"; mark.style.height = r.height+"px";
+        mark.classList.remove("pulse"); mark.classList.add("portal");
+        setTimeout(enterGame, 570);
+      }
+    });
+
+    const game = document.getElementById("game"), canvas = document.getElementById("gameCanvas"), ctx = canvas.getContext("2d");
+    const scoreEl = document.getElementById("score"), msg = document.getElementById("gameMessage");
+    let W,H,bird,pipes,score,best,state,last,spawn;
+
+    function resize(){ W=canvas.width=innerWidth*devicePixelRatio; H=canvas.height=innerHeight*devicePixelRatio; ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); W=innerWidth; H=innerHeight; }
+    addEventListener("resize",resize); resize();
+
+    function resetGame(){
+      bird={x:Math.min(110,W*.28),y:H*.46,vy:0,r:15};
+      pipes=[]; score=0; spawn=0; state="ready"; scoreEl.textContent="0";
+      msg.innerHTML="<strong>v4ng3n flappy</strong><small>tap / click / space to flap<br>best: "+(localStorage.getItem("v4ng3nFlappyBest")||0)+"</small>";
+      msg.classList.remove("hidden"); last=performance.now();
+    }
+    function enterGame(){ game.classList.add("active"); game.setAttribute("aria-hidden","false"); document.body.style.overflow="hidden"; resetGame(); requestAnimationFrame(loop); }
+    function leaveGame(){ game.classList.remove("active"); game.setAttribute("aria-hidden","true"); document.body.style.overflow=""; mark.classList.remove("portal"); mark.removeAttribute("style"); state="off"; }
+
+    function flap(){
+      if(!game.classList.contains("active")) return;
+      if(state==="dead"){ resetGame(); state="play"; msg.classList.add("hidden"); bird.vy=-420; return; }
+      if(state==="ready"){ state="play"; msg.classList.add("hidden"); }
+      bird.vy=-420;
+    }
+    game.addEventListener("pointerdown",e=>{ if(e.target.id!=="exitGame") flap(); });
+    addEventListener("keydown",e=>{ if(!game.classList.contains("active")) return; if(e.code==="Space"){e.preventDefault();flap()} if(e.code==="Escape") leaveGame(); });
+    document.getElementById("exitGame").onclick=e=>{e.stopPropagation();leaveGame()};
+
+    function die(){
+      if(state!=="play") return; state="dead";
+      best=Math.max(score,+(localStorage.getItem("v4ng3nFlappyBest")||0)); localStorage.setItem("v4ng3nFlappyBest",best);
+      msg.innerHTML="<strong>connection lost.</strong><small>score: "+score+" · best: "+best+"<br>tap to try again</small>"; msg.classList.remove("hidden");
+    }
+
+    function loop(t){
+      if(!game.classList.contains("active")) return;
+      const dt=Math.min((t-last)/1000,.033); last=t;
+      if(state==="play"){
+        bird.vy+=1250*dt; bird.y+=bird.vy*dt; spawn-=dt;
+        if(spawn<=0){ const gap=Math.max(155,Math.min(205,H*.25)); const top=80+Math.random()*(H-gap-190); pipes.push({x:W+70,top,gap,w:72,passed:false}); spawn=1.45; }
+        pipes.forEach(p=>p.x-=190*dt);
+        pipes=pipes.filter(p=>p.x>-100);
+        for(const p of pipes){
+          if(!p.passed && p.x+p.w<bird.x){p.passed=true;score++;scoreEl.textContent=score}
+          if(bird.x+bird.r>p.x && bird.x-bird.r<p.x+p.w && (bird.y-bird.r<p.top || bird.y+bird.r>p.top+p.gap)) die();
+        }
+        if(bird.y+bird.r>H || bird.y-bird.r<0) die();
+      }
+      draw(t); requestAnimationFrame(loop);
+    }
+
+    function draw(t){
+      ctx.clearRect(0,0,W,H);
+      const g=ctx.createLinearGradient(0,0,W,H); g.addColorStop(0,"#7797ff"); g.addColorStop(1,"#5067dc"); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+      ctx.save(); ctx.globalAlpha=.075; ctx.fillStyle="#fff"; ctx.font="900 "+Math.min(W*.8,H*.72)+"px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("V",W*.52,H*.51); ctx.restore();
+
+      for(const p of pipes){
+        const pg=ctx.createLinearGradient(p.x,0,p.x+p.w,0); pg.addColorStop(0,"#17213d"); pg.addColorStop(.5,"#24345f"); pg.addColorStop(1,"#11192f");
+        ctx.fillStyle=pg; ctx.strokeStyle="rgba(255,255,255,.18)"; ctx.lineWidth=2;
+        ctx.fillRect(p.x,0,p.w,p.top); ctx.strokeRect(p.x,0,p.w,p.top);
+        ctx.fillRect(p.x,p.top+p.gap,p.w,H-p.top-p.gap); ctx.strokeRect(p.x,p.top+p.gap,p.w,H-p.top-p.gap);
+        ctx.fillStyle="#2c3e70"; ctx.fillRect(p.x-7,p.top-24,p.w+14,24); ctx.strokeRect(p.x-7,p.top-24,p.w+14,24);
+        ctx.fillRect(p.x-7,p.top+p.gap,p.w+14,24); ctx.strokeRect(p.x-7,p.top+p.gap,p.w+14,24);
+      }
+
+      const bob=state==="ready"?Math.sin(t/180)*5:0, y=bird.y+bob, rot=Math.max(-.35,Math.min(.65,bird.vy/700));
+      ctx.save(); ctx.translate(bird.x,y); ctx.rotate(rot);
+      ctx.fillStyle="#f5f7fb"; ctx.beginPath(); ctx.ellipse(0,0,17,14,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#a9baff"; ctx.beginPath(); ctx.ellipse(-8,5,11,7,-.35,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle="#ffcc70"; ctx.beginPath(); ctx.moveTo(14,-2);ctx.lineTo(27,3);ctx.lineTo(14,7);ctx.closePath();ctx.fill();
+      ctx.fillStyle="#17213d"; ctx.beginPath();ctx.arc(8,-5,3.2,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(9,-6,1.1,0,Math.PI*2);ctx.fill(); ctx.restore();
+    }
+  </script>
 </body>
 </html>
